@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Meu Painel</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#17191D">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Meu Painel">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red:#E4032E; --red-dark:#B00223; --ink:#17191D; --ink-soft:#22252B;
+    --bg:#F6F7F9; --border:#E2E5EA; --text:#1B1E24; --muted:#7A828E;
+    --green:#0E9F6E; --green-bg:#D9F3E7; --amber:#92660A; --amber-bg:#FCEEC9;
+    --rose:#C81E4A; --rose-bg:#FBE1E8;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;padding-bottom:90px}
+  .display{font-family:'Archivo',sans-serif}
+
+  .topbar{position:sticky;top:0;z-index:10;background:var(--ink);color:#fff;display:flex;align-items:center;gap:12px;padding:14px 16px}
+  .logo{width:34px;height:34px;border-radius:8px;background:var(--red);display:flex;align-items:center;justify-content:center;font-family:'Archivo';font-weight:800;font-size:18px}
+  .brand{font-family:'Archivo';font-weight:700;font-size:17px}
+  .topbar small{margin-left:auto;font-size:11px;color:#9AA1AC}
+
+  main{padding:16px;max-width:640px;margin:0 auto}
+
+  /* Resumo do dia */
+  .hoje{background:var(--ink);border-radius:14px;padding:16px;color:#fff;margin-bottom:16px}
+  .hoje .tit{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9AA1AC}
+  .hoje .ganho{font-family:'Archivo';font-weight:800;font-size:30px;margin-top:4px;color:#4ADE94}
+  .hoje .linha{display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)}
+  .hoje .linha div{flex:1}
+  .hoje .linha b{display:block;font-family:'Archivo';font-weight:700;font-size:16px}
+  .hoje .linha span{font-size:10px;color:#9AA1AC}
+  .hoje .perdido b{color:#F87191}
+
+  /* Filtros */
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;-webkit-overflow-scrolling:touch}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex-shrink:0;padding:8px 14px;border-radius:99px;font-size:12.5px;font-weight:500;background:#fff;border:1px solid var(--border);color:#5A616C;cursor:pointer}
+  .chip.on{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+  .chip .n{opacity:.7;font-size:11px}
+
+  /* Lista de clientes */
+  .lista{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+  .cli{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:0 1px 2px rgba(23,25,29,.04)}
+  .cli-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .cli .nm{font-size:14.5px;font-weight:600;line-height:1.3}
+  .cli .tel{font-size:12px;color:var(--muted);margin-top:1px}
+  .tag{flex-shrink:0;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:600}
+  .t-NAO_RESPONDEU{background:#EEF0F3;color:#5A616C}
+  .t-INTERESSADO{background:#DBEAFE;color:#1D4FA8}
+  .t-DOCUMENTOS{background:#EDE4FC;color:#6B33B8}
+  .t-MANDOU_PAGAR{background:var(--amber-bg);color:var(--amber)}
+  .t-PAGO{background:var(--green-bg);color:#087954}
+  .t-NAO_LIBEROU{background:var(--rose-bg);color:var(--rose)}
+  .cli-val{display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:1px solid #F0F2F4}
+  .cli-val div{flex:1}
+  .cli-val span{display:block;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .cli-val b{font-family:'Archivo';font-weight:700;font-size:15px}
+  .cli-val .com b{color:var(--green)}
+  .cli-acts{display:flex;gap:8px;margin-top:12px}
+  .abtn{flex:1;padding:9px 0;border-radius:9px;font-family:'Inter';font-size:12.5px;font-weight:600;border:1px solid var(--border);background:#fff;color:#3A414C;cursor:pointer;text-align:center;text-decoration:none}
+  .abtn.wa{background:#0E9F6E;border-color:#0E9F6E;color:#fff}
+  .vazio{text-align:center;padding:48px 20px;color:var(--muted);font-size:13.5px}
+
+  /* FAB */
+  .fab{position:fixed;bottom:22px;right:18px;z-index:20;width:58px;height:58px;border-radius:99px;background:var(--red);color:#fff;border:none;font-size:30px;font-weight:300;box-shadow:0 6px 20px rgba(228,3,46,.4);cursor:pointer}
+  .fab:active{background:var(--red-dark)}
+
+  /* Modal */
+  .overlay{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center}
+  .overlay.open{display:flex}
+  .sheet{background:#fff;width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:20px 18px 30px;max-height:88vh;overflow-y:auto}
+  .sheet h3{font-family:'Archivo';font-weight:700;font-size:17px;margin-bottom:16px}
+  .fld{margin-bottom:12px}
+  .fld label{display:block;font-size:12.5px;font-weight:600;margin-bottom:5px}
+  .fld input,.fld select,.fld textarea{width:100%;padding:11px 12px;border:1px solid #CBD0D8;border-radius:10px;font-family:'Inter';font-size:15px;background:#fff;outline:none}
+  .fld input:focus,.fld select:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(228,3,46,.12)}
+  .previa{background:var(--green-bg);border-radius:10px;padding:11px 13px;font-size:13px;color:#087954;margin-bottom:14px}
+  .previa b{font-family:'Archivo';font-weight:700}
+  .sheet-acts{display:flex;gap:10px;margin-top:6px}
+  .btn{flex:1;padding:13px 0;border-radius:11px;font-family:'Inter';font-size:14.5px;font-weight:600;border:none;cursor:pointer}
+  .btn.pri{background:var(--red);color:#fff}
+  .btn.pri:active{background:var(--red-dark)}
+  .btn.sec{background:#fff;border:1px solid var(--border);color:#3A414C}
+  .btn.del{background:#fff;border:1px solid #F3C2CE;color:var(--rose)}
+  .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:50;background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+  .loading{text-align:center;padding:60px 0;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">C</div>
+  <span class="brand">Meu Painel</span>
+  <small id="totalInfo"></small>
+</header>
+
+<main>
+  <div class="hoje">
+    <div class="tit">Ganho hoje (comissão 37%)</div>
+    <div class="ganho" id="ganhoHoje">R$ 0,00</div>
+    <div class="linha">
+      <div><b id="fechadosHoje">0</b><span>pagos hoje</span></div>
+      <div class="perdido"><b id="perdidoHoje">R$ 0</b><span>perdido hoje</span></div>
+      <div><b id="ganhoMes">R$ 0</b><span>ganho no mês</span></div>
+    </div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+  <div class="lista" id="lista"><div class="loading">Carregando seus clientes...</div></div>
+</main>
+
+<button class="fab" id="fabAdd" aria-label="Novo cliente">+</button>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h3 id="sheetTitle">Novo cliente</h3>
+    <div class="fld"><label>Nome *</label><input id="fNome" placeholder="Nome do cliente"></div>
+    <div class="fld"><label>WhatsApp (com DDD)</label><input id="fTel" inputmode="tel" placeholder="96 99999-9999"></div>
+    <div class="fld"><label>Valor que libera (R$)</label><input id="fValor" inputmode="decimal" placeholder="0,00"></div>
+    <div class="previa" id="previa" style="display:none">Sua comissão (37%): <b id="previaVal">R$ 0,00</b></div>
+    <div class="fld"><label>Etapa</label>
+      <select id="fEtapa">
+        <option value="NAO_RESPONDEU">Não respondeu</option>
+        <option value="INTERESSADO">Interessado</option>
+        <option value="DOCUMENTOS">Pegou documento</option>
+        <option value="MANDOU_PAGAR">Mandou pagar</option>
+        <option value="PAGO">Pago ✅</option>
+        <option value="NAO_LIBEROU">Não liberou ❌</option>
+      </select>
+    </div>
+    <div class="fld"><label>Observação</label><textarea id="fObs" rows="2" placeholder="Ex.: aguardando contracheque"></textarea></div>
+    <div class="sheet-acts">
+      <button class="btn del" id="btnDel" style="display:none">Excluir</button>
+      <button class="btn sec" id="btnCancel">Cancelar</button>
+      <button class="btn pri" id="btnSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = 'capitalcred-clientes';
+const COMISSAO = 0.37;
+const ETAPAS = {
+  NAO_RESPONDEU: 'Não respondeu',
+  INTERESSADO: 'Interessado',
+  DOCUMENTOS: 'Pegou documento',
+  MANDOU_PAGAR: 'Mandou pagar',
+  PAGO: 'Pago',
+  NAO_LIBEROU: 'Não liberou'
+};
+const ORDEM = ['TODOS','INTERESSADO','DOCUMENTOS','MANDOU_PAGAR','NAO_RESPONDEU','PAGO','NAO_LIBEROU'];
+
+let clientes = [];
+let filtro = 'TODOS';
+let editId = null;
+
+const $ = id => document.getElementById(id);
+const brl = v => (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const hojeStr = () => new Date().toDateString();
+const mesStr = () => { const d = new Date(); return d.getFullYear()+'-'+d.getMonth(); };
+const dataMes = ts => { const d = new Date(ts); return d.getFullYear()+'-'+d.getMonth(); };
+
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+async function load(){
+  try {
+    const r = localStorage.getItem(KEY);
+    clientes = r ? JSON.parse(r) : [];
+  } catch(e) { clientes = []; }
+  render();
+}
+
+async function save(){
+  try {
+    localStorage.setItem(KEY, JSON.stringify(clientes));
+  } catch(e) { toast('Erro ao salvar. Tenta de novo.'); }
+}
+
+function stats(){
+  const hoje = hojeStr(), mes = mesStr();
+  let ganhoHoje=0, fechadosHoje=0, perdidoHoje=0, ganhoMes=0;
+  for(const c of clientes){
+    const com = (c.valor||0)*COMISSAO;
+    if(c.etapa==='PAGO' && c.pagoEm){
+      if(new Date(c.pagoEm).toDateString()===hoje){ ganhoHoje+=com; fechadosHoje++; }
+      if(dataMes(c.pagoEm)===mes) ganhoMes+=com;
+    }
+    if(c.etapa==='NAO_LIBEROU' && c.perdidoEm && new Date(c.perdidoEm).toDateString()===hoje){
+      perdidoHoje+=com;
+    }
+  }
+  $('ganhoHoje').textContent = brl(ganhoHoje);
+  $('fechadosHoje').textContent = fechadosHoje;
+  $('perdidoHoje').textContent = brl(perdidoHoje);
+  $('ganhoMes').textContent = brl(ganhoMes);
+  $('totalInfo').textContent = clientes.length + ' clientes';
+}
+
+function renderChips(){
+  const box = $('chips'); box.innerHTML='';
+  for(const k of ORDEM){
+    const n = k==='TODOS' ? clientes.length : clientes.filter(c=>c.etapa===k).length;
+    const el = document.createElement('button');
+    el.className = 'chip'+(filtro===k?' on':'');
+    el.innerHTML = (k==='TODOS'?'Todos':ETAPAS[k]) + ' <span class="n">'+n+'</span>';
+    el.onclick = ()=>{ filtro=k; render(); };
+    box.appendChild(el);
+  }
+}
+
+function waLink(tel){
+  const d = (tel||'').replace(/\D/g,'');
+  if(!d) return null;
+  return 'https://wa.me/'+(d.startsWith('55')?d:'55'+d);
+}
+
+function renderLista(){
+  const box = $('lista'); box.innerHTML='';
+  const itens = clientes
+    .filter(c=>filtro==='TODOS'||c.etapa===filtro)
+    .sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+
+  if(itens.length===0){
+    box.innerHTML = '<div class="vazio">Nenhum cliente aqui ainda.<br>Toca no <b>+</b> pra cadastrar o primeiro.</div>';
+    return;
+  }
+
+  for(const c of itens){
+    const com = (c.valor||0)*COMISSAO;
+    const wa = waLink(c.tel);
+    const div = document.createElement('div');
+    div.className='cli';
+    div.innerHTML =
+      '<div class="cli-top"><div><div class="nm"></div><div class="tel"></div></div>'+
+      '<span class="tag t-'+c.etapa+'">'+ETAPAS[c.etapa]+'</span></div>'+
+      '<div class="cli-val">'+
+        '<div><span>Libera</span><b>'+brl(c.valor)+'</b></div>'+
+        '<div class="com"><span>Comissão 37%</span><b>'+brl(com)+'</b></div>'+
+      '</div>'+
+      '<div class="cli-acts">'+
+        (wa?'<a class="abtn wa" target="_blank" href="'+wa+'">WhatsApp</a>':'')+
+        '<button class="abtn ed">Editar</button>'+
+      '</div>';
+    div.querySelector('.nm').textContent = c.nome;
+    div.querySelector('.tel').textContent = (c.tel||'sem telefone') + (c.obs?' · '+c.obs:'');
+    div.querySelector('.ed').onclick = ()=>abrirEditar(c.id);
+    box.appendChild(div);
+  }
+}
+
+function render(){ stats(); renderChips(); renderLista(); }
+
+/* ---------- Modal ---------- */
+function abrirNovo(){
+  editId=null;
+  $('sheetTitle').textContent='Novo cliente';
+  $('fNome').value=''; $('fTel').value=''; $('fValor').value='';
+  $('fEtapa').value='NAO_RESPONDEU'; $('fObs').value='';
+  $('btnDel').style.display='none';
+  atualizaPrevia();
+  $('overlay').classList.add('open');
+}
+
+function abrirEditar(id){
+  const c = clientes.find(x=>x.id===id); if(!c) return;
+  editId=id;
+  $('sheetTitle').textContent='Editar cliente';
+  $('fNome').value=c.nome; $('fTel').value=c.tel||'';
+  $('fValor').value=c.valor||''; $('fEtapa').value=c.etapa; $('fObs').value=c.obs||'';
+  $('btnDel').style.display='block';
+  atualizaPrevia();
+  $('overlay').classList.add('open');
+}
+
+function fechar(){ $('overlay').classList.remove('open'); }
+
+function atualizaPrevia(){
+  const v = parseFloat(String($('fValor').value).replace(/\./g,'').replace(',','.'))||parseFloat($('fValor').value)||0;
+  if(v>0){ $('previa').style.display='block'; $('previaVal').textContent=brl(v*COMISSAO); }
+  else $('previa').style.display='none';
+}
+
+async function salvar(){
+  const nome = $('fNome').value.trim();
+  if(!nome){ toast('Coloca o nome do cliente'); return; }
+  const raw = String($('fValor').value).trim();
+  let valor = parseFloat(raw.replace(/\./g,'').replace(',','.'));
+  if(isNaN(valor)) valor = parseFloat(raw)||0;
+  const etapa = $('fEtapa').value;
+  const agora = Date.now();
+
+  if(editId){
+    const c = clientes.find(x=>x.id===editId);
+    const etapaAntiga = c.etapa;
+    Object.assign(c,{nome, tel:$('fTel').value.trim(), valor, etapa, obs:$('fObs').value.trim(), updatedAt:agora});
+    if(etapa==='PAGO' && etapaAntiga!=='PAGO') c.pagoEm=agora;
+    if(etapa==='NAO_LIBEROU' && etapaAntiga!=='NAO_LIBEROU') c.perdidoEm=agora;
+  } else {
+    clientes.push({
+      id:'c'+agora+Math.random().toString(36).slice(2,6),
+      nome, tel:$('fTel').value.trim(), valor, etapa, obs:$('fObs').value.trim(),
+      createdAt:agora, updatedAt:agora,
+      pagoEm: etapa==='PAGO'?agora:null,
+      perdidoEm: etapa==='NAO_LIBEROU'?agora:null
+    });
+  }
+  await save();
+  fechar(); render();
+  toast(editId?'Cliente atualizado':'Cliente salvo');
+}
+
+async function excluir(){
+  if(!editId) return;
+  if(!confirm('Excluir esse cliente?')) return;
+  clientes = clientes.filter(x=>x.id!==editId);
+  await save();
+  fechar(); render();
+  toast('Cliente excluído');
+}
+
+$('fabAdd').onclick = abrirNovo;
+$('btnCancel').onclick = fechar;
+$('btnSave').onclick = salvar;
+$('btnDel').onclick = excluir;
+$('fValor').addEventListener('input', atualizaPrevia);
+$('overlay').addEventListener('click', e=>{ if(e.target===$('overlay')) fechar(); });
+
+load();
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
