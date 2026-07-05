@@ -137,6 +137,7 @@
         <option value="NAO_LIBEROU">Não liberou ❌</option>
       </select>
     </div>
+    <div class="fld"><label>Data</label><input id="fData" type="date"></div>
     <div class="fld"><label>Observação</label><textarea id="fObs" rows="2" placeholder="Ex.: aguardando contracheque"></textarea></div>
     <div class="sheet-acts">
       <button class="btn del" id="btnDel" style="display:none">Excluir</button>
@@ -168,6 +169,8 @@ let editId = null;
 const $ = id => document.getElementById(id);
 const brl = v => (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const hojeStr = () => new Date().toDateString();
+const tsFromInput = v => { if(!v) return Date.now(); const p=v.split('-').map(Number); return new Date(p[0],p[1]-1,p[2],12).getTime(); };
+const toInput = ts => { const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const mesStr = () => { const d = new Date(); return d.getFullYear()+'-'+d.getMonth(); };
 const dataMes = ts => { const d = new Date(ts); return d.getFullYear()+'-'+d.getMonth(); };
 
@@ -256,7 +259,7 @@ function renderLista(){
         '<button class="abtn ed">Editar</button>'+
       '</div>';
     div.querySelector('.nm').textContent = c.nome;
-    div.querySelector('.tel').textContent = (c.tel||'sem telefone') + (c.obs?' · '+c.obs:'');
+    div.querySelector('.tel').textContent = new Date(c.dataRef||c.createdAt).toLocaleDateString('pt-BR') + ' · ' + (c.tel||'sem telefone') + (c.obs?' · '+c.obs:'');
     div.querySelector('.ed').onclick = ()=>abrirEditar(c.id);
     box.appendChild(div);
   }
@@ -269,7 +272,7 @@ function abrirNovo(){
   editId=null;
   $('sheetTitle').textContent='Novo cliente';
   $('fNome').value=''; $('fTel').value=''; $('fValor').value='';
-  $('fEtapa').value='NAO_RESPONDEU'; $('fObs').value='';
+  $('fEtapa').value='NAO_RESPONDEU'; $('fObs').value=''; $('fData').value=toInput(Date.now());
   $('btnDel').style.display='none';
   atualizaPrevia();
   $('overlay').classList.add('open');
@@ -281,6 +284,7 @@ function abrirEditar(id){
   $('sheetTitle').textContent='Editar cliente';
   $('fNome').value=c.nome; $('fTel').value=c.tel||'';
   $('fValor').value=c.valor||''; $('fEtapa').value=c.etapa; $('fObs').value=c.obs||'';
+  $('fData').value=toInput(c.dataRef||c.pagoEm||c.perdidoEm||c.createdAt||Date.now());
   $('btnDel').style.display='block';
   atualizaPrevia();
   $('overlay').classList.add('open');
@@ -302,20 +306,20 @@ async function salvar(){
   if(isNaN(valor)) valor = parseFloat(raw)||0;
   const etapa = $('fEtapa').value;
   const agora = Date.now();
+  const dataTs = tsFromInput($('fData').value);
 
   if(editId){
     const c = clientes.find(x=>x.id===editId);
-    const etapaAntiga = c.etapa;
-    Object.assign(c,{nome, tel:$('fTel').value.trim(), valor, etapa, obs:$('fObs').value.trim(), updatedAt:agora});
-    if(etapa==='PAGO' && etapaAntiga!=='PAGO') c.pagoEm=agora;
-    if(etapa==='NAO_LIBEROU' && etapaAntiga!=='NAO_LIBEROU') c.perdidoEm=agora;
+    Object.assign(c,{nome, tel:$('fTel').value.trim(), valor, etapa, obs:$('fObs').value.trim(), updatedAt:agora, dataRef:dataTs});
+    if(etapa==='PAGO') c.pagoEm=dataTs;
+    if(etapa==='NAO_LIBEROU') c.perdidoEm=dataTs;
   } else {
     clientes.push({
       id:'c'+agora+Math.random().toString(36).slice(2,6),
       nome, tel:$('fTel').value.trim(), valor, etapa, obs:$('fObs').value.trim(),
-      createdAt:agora, updatedAt:agora,
-      pagoEm: etapa==='PAGO'?agora:null,
-      perdidoEm: etapa==='NAO_LIBEROU'?agora:null
+      createdAt:agora, updatedAt:agora, dataRef:dataTs,
+      pagoEm: etapa==='PAGO'?dataTs:null,
+      perdidoEm: etapa==='NAO_LIBEROU'?dataTs:null
     });
   }
   await save();
