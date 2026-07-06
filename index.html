@@ -189,6 +189,13 @@
   <div class="sheet">
     <h3>Configurações</h3>
 
+    <h4>💰 % de comissão</h4>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Vale pros próximos clientes. Quem já pagou mantém a taxa da época.</p>
+    <div class="fld" style="display:flex;gap:8px">
+      <input id="fPct" inputmode="decimal" placeholder="37" style="flex:1">
+      <button class="btn pri" id="btnPct" style="flex:0 0 auto;padding:11px 16px">Salvar</button>
+    </div>
+
     <h4>🎯 Meta do mês</h4>
     <div class="fld" style="display:flex;gap:8px">
       <input id="fMeta" inputmode="decimal" placeholder="Ex.: 5000" style="flex:1">
@@ -230,7 +237,8 @@
 const KEY = 'capitalcred-clientes';
 const KEY_NUM = 'capitalcred-numeros';
 const KEY_META = 'capitalcred-meta';
-const COMISSAO = 0.37;
+const KEY_PCT = 'capitalcred-comissao';
+let pctGlobal = 37;
 const ETAPAS = {
   NAO_RESPONDEU:'Não respondeu', INTERESSADO:'Interessado', DOCUMENTOS:'Pegou documento',
   MANDOU_PAGAR:'Mandou pagar', PAGO:'Pago', NAO_LIBEROU:'Não liberou'
@@ -253,6 +261,14 @@ const tsFromInput = v => { if(!v) return null; const p=v.split('-').map(Number);
 const toInput = ts => { const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const fimDoDia = ts => { const d=new Date(ts); d.setHours(23,59,59,999); return d.getTime(); };
 
+function comFor(c){
+  const pct = ((c.etapa==='PAGO'||c.etapa==='NAO_LIBEROU') && c.pct!=null) ? c.pct : pctGlobal;
+  return (c.valor||0)*pct/100;
+}
+function pctOf(c){
+  return ((c.etapa==='PAGO'||c.etapa==='NAO_LIBEROU') && c.pct!=null) ? c.pct : pctGlobal;
+}
+
 function toast(msg){
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2000);
@@ -262,17 +278,28 @@ function load(){
   try { clientes = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ clientes = []; }
   try { numeros = JSON.parse(localStorage.getItem(KEY_NUM)) || []; } catch(e){ numeros = []; }
   meta = parseFloat(localStorage.getItem(KEY_META)) || 0;
+  pctGlobal = parseFloat(localStorage.getItem(KEY_PCT)) || 37;
+  let migrou = false;
+  for(const c of clientes){
+    if((c.etapa==='PAGO'||c.etapa==='NAO_LIBEROU') && c.pct==null){ c.pct = pctGlobal; migrou = true; }
+  }
+  if(migrou) save();
+  atualizaLabels();
   render();
 }
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(clientes)); } catch(e){ toast('Erro ao salvar'); } }
 function saveNumeros(){ try { localStorage.setItem(KEY_NUM, JSON.stringify(numeros)); } catch(e){} }
 
 /* ---------- Stats + meta ---------- */
+function atualizaLabels(){
+  document.querySelector('.hoje .tit').textContent = 'Ganho hoje (comissão '+pctGlobal+'%)';
+}
+
 function stats(){
   const hoje = hojeStr(), mes = mesStr();
   let ganhoHoje=0, fechadosHoje=0, perdidoHoje=0, ganhoMes=0;
   for(const c of clientes){
-    const com = (c.valor||0)*COMISSAO;
+    const com = comFor(c);
     if(c.etapa==='PAGO' && c.pagoEm){
       if(new Date(c.pagoEm).toDateString()===hoje){ ganhoHoje+=com; fechadosHoje++; }
       if(dataMes(c.pagoEm)===mes) ganhoMes+=com;
@@ -374,7 +401,7 @@ function renderLista(){
     return;
   }
   for(const c of itens){
-    const com = (c.valor||0)*COMISSAO;
+    const com = comFor(c);
     const wa = waLink(c.tel);
     const pendente = c.retorno && c.etapa!=='PAGO' && c.etapa!=='NAO_LIBEROU';
     const div = document.createElement('div');
@@ -385,7 +412,7 @@ function renderLista(){
       '</div><span class="tag t-'+c.etapa+'">'+ETAPAS[c.etapa]+'</span></div>'+
       '<div class="cli-val">'+
         '<div><span>Libera</span><b>'+brl(c.valor)+'</b></div>'+
-        '<div class="com"><span>Comissão 37%</span><b>'+brl(com)+'</b></div>'+
+        '<div class="com"><span>Comissão '+pctOf(c)+'%</span><b>'+brl(com)+'</b></div>'+
       '</div>'+
       '<div class="cli-acts">'+
         (wa?'<a class="abtn wa" target="_blank" href="'+wa+'">WhatsApp</a>':'')+
@@ -410,7 +437,7 @@ function abrirExtrato(){
     if(c.etapa==='PAGO' && c.pagoEm && dataMes(c.pagoEm)===mes){
       const dia = new Date(c.pagoEm).getDate();
       if(!porDia[dia]) porDia[dia] = { total:0, n:0 };
-      porDia[dia].total += (c.valor||0)*COMISSAO;
+      porDia[dia].total += comFor(c);
       porDia[dia].n++;
     }
   }
@@ -478,7 +505,7 @@ function fechar(){ $('overlay').classList.remove('open'); }
 
 function atualizaPrevia(){
   const v = parseFloat(String($('fValor').value).replace(/\./g,'').replace(',','.'))||parseFloat($('fValor').value)||0;
-  if(v>0){ $('previa').style.display='block'; $('previaVal').textContent=brl(v*COMISSAO); }
+  if(v>0){ document.querySelector('#previa').firstChild.textContent='Sua comissão ('+pctGlobal+'%): '; $('previa').style.display='block'; $('previaVal').textContent=brl(v*pctGlobal/100); }
   else $('previa').style.display='none';
 }
 
@@ -497,15 +524,17 @@ function salvar(){
     const c = clientes.find(x=>x.id===editId);
     Object.assign(c,{nome, tel:$('fTel').value.trim(), valor, etapa, obs:$('fObs').value.trim(),
       numero:$('fNumero').value, updatedAt:agora, dataRef:dataTs, retorno:retornoTs});
-    if(etapa==='PAGO') c.pagoEm=dataTs;
-    if(etapa==='NAO_LIBEROU') c.perdidoEm=dataTs;
+    if(etapa==='PAGO'){ c.pagoEm=dataTs; if(c.pct==null) c.pct=pctGlobal; }
+    else if(etapa==='NAO_LIBEROU'){ c.perdidoEm=dataTs; if(c.pct==null) c.pct=pctGlobal; }
+    else { c.pct=null; }
   } else {
     clientes.push({
       id:'c'+agora+Math.random().toString(36).slice(2,6),
       nome, tel:$('fTel').value.trim(), valor, etapa, obs:$('fObs').value.trim(),
       numero:$('fNumero').value, createdAt:agora, updatedAt:agora, dataRef:dataTs, retorno:retornoTs,
       pagoEm: etapa==='PAGO'?dataTs:null,
-      perdidoEm: etapa==='NAO_LIBEROU'?dataTs:null
+      perdidoEm: etapa==='NAO_LIBEROU'?dataTs:null,
+      pct: (etapa==='PAGO'||etapa==='NAO_LIBEROU')?pctGlobal:null
     });
   }
   save(); fechar(); render();
@@ -542,7 +571,7 @@ function renderListaNumeros(){
 }
 
 function exportar(){
-  const dados = { app:'meu-painel', versao:2, exportadoEm:new Date().toISOString(), clientes, numeros, meta };
+  const dados = { app:'meu-painel', versao:3, exportadoEm:new Date().toISOString(), clientes, numeros, meta, comissao:pctGlobal };
   const blob = new Blob([JSON.stringify(dados,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -562,6 +591,7 @@ function importar(file){
       clientes = d.clientes;
       numeros = Array.isArray(d.numeros) ? d.numeros : numeros;
       if(typeof d.meta === 'number') { meta = d.meta; localStorage.setItem(KEY_META, String(meta)); }
+      if(typeof d.comissao === 'number' && d.comissao>0) { pctGlobal = d.comissao; localStorage.setItem(KEY_PCT, String(pctGlobal)); atualizaLabels(); }
       save(); saveNumeros(); render();
       $('overlayCfg').classList.remove('open');
       toast('Backup importado ✅');
@@ -578,7 +608,7 @@ $('btnDel').onclick = excluir;
 $('fValor').addEventListener('input', atualizaPrevia);
 $('overlay').addEventListener('click', e=>{ if(e.target===$('overlay')) fechar(); });
 
-$('btnCfg').onclick = ()=>{ $('fMeta').value = meta||''; renderListaNumeros(); $('overlayCfg').classList.add('open'); };
+$('btnCfg').onclick = ()=>{ $('fMeta').value = meta||''; $('fPct').value = pctGlobal; renderListaNumeros(); $('overlayCfg').classList.add('open'); };
 $('btnCfgFechar').onclick = ()=>$('overlayCfg').classList.remove('open');
 $('overlayCfg').addEventListener('click', e=>{ if(e.target===$('overlayCfg')) $('overlayCfg').classList.remove('open'); });
 
@@ -588,6 +618,15 @@ $('btnMeta').onclick = ()=>{
   localStorage.setItem(KEY_META, String(v));
   stats();
   toast(v>0 ? 'Meta salva: '+brl(v) : 'Meta removida');
+};
+
+$('btnPct').onclick = ()=>{
+  const v = parseFloat(String($('fPct').value).replace(',','.'));
+  if(isNaN(v) || v<=0 || v>100){ toast('Coloca uma porcentagem válida (ex.: 35)'); return; }
+  pctGlobal = v;
+  localStorage.setItem(KEY_PCT, String(v));
+  atualizaLabels(); render();
+  toast('Comissão atualizada pra '+v+'%');
 };
 
 $('btnAddNumero').onclick = ()=>{
