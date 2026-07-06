@@ -113,6 +113,32 @@
   .ext-total{display:flex;justify-content:space-between;padding:14px 4px 4px;font-size:14.5px;font-weight:700}
   .ext-total b{font-family:'Archivo';color:var(--green);font-size:16px}
 
+  #printArea{position:fixed;inset:0;z-index:60;background:#fff;overflow-y:auto;display:none;padding:24px 20px}
+  #printArea.open{display:block}
+  .rec{max-width:560px;margin:0 auto;color:#111;font-size:14px}
+  .rec-head{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #E4032E;padding-bottom:14px;margin-bottom:20px}
+  .rec-head .rh-l{display:flex;align-items:center;gap:10px}
+  .rec-logo{width:38px;height:38px;border-radius:9px;background:#E4032E;color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Archivo';font-weight:800;font-size:20px}
+  .rec-head h2{font-family:'Archivo';font-weight:800;font-size:20px;letter-spacing:.02em}
+  .rec-num{font-size:12px;color:#666;text-align:right}
+  .rec-row{margin-bottom:14px}
+  .rec-row span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-bottom:2px}
+  .rec-row p{font-size:15px}
+  .rec-valor{background:#F6F7F9;border:1px solid #E2E5EA;border-radius:10px;padding:14px 16px;margin:18px 0}
+  .rec-valor span{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#888}
+  .rec-valor b{display:block;font-family:'Archivo';font-weight:800;font-size:26px;margin-top:2px}
+  .rec-ass{margin-top:56px;text-align:center}
+  .rec-ass .linha-ass{border-top:1.5px solid #111;width:280px;margin:0 auto;padding-top:8px}
+  .rec-ass p{font-size:13.5px;font-weight:600}
+  .rec-ass small{font-size:12px;color:#555}
+  .rec-foot{margin-top:28px;text-align:center;font-size:11px;color:#999}
+  .rec-btns{display:flex;gap:10px;max-width:560px;margin:22px auto 40px}
+  @media print {
+    body > *:not(#printArea){ display:none !important }
+    #printArea{ position:static; display:block !important; padding:0 }
+    .no-print{ display:none !important }
+    body{ padding:0; background:#fff }
+  }
   .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:50;background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:88%;text-align:center}
   .toast.show{opacity:1}
 </style>
@@ -211,6 +237,14 @@
       <button class="btn pri" id="btnAddNumero" style="flex:0 0 auto;padding:11px 16px">Adicionar</button>
     </div>
 
+    <h4>🧾 Meus dados (recibo)</h4>
+    <div class="fld"><input id="fEmNome" placeholder="Teu nome ou razão social"></div>
+    <div class="fld"><input id="fEmDoc" placeholder="CPF ou CNPJ"></div>
+    <div class="fld" style="display:flex;gap:8px">
+      <input id="fEmCidade" placeholder="Cidade/UF" style="flex:1">
+      <button class="btn pri" id="btnEmissor" style="flex:0 0 auto;padding:11px 16px">Salvar</button>
+    </div>
+
     <h4>💾 Backup</h4>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Teus dados ficam só neste celular. Exporta de vez em quando pra não perder nada.</p>
     <div class="sheet-acts" style="margin-top:0">
@@ -232,6 +266,30 @@
   </div>
 </div>
 
+<!-- Recibo: dados -->
+<div class="overlay" id="overlayRec">
+  <div class="sheet">
+    <h3>Gerar recibo</h3>
+    <div class="fld"><label>Valor do recibo (R$)</label><input id="fRecValor" inputmode="decimal"></div>
+    <div class="fld"><label>Referente a</label><textarea id="fRecDesc" rows="2"></textarea></div>
+    <div class="fld"><label>Data</label><input id="fRecData" type="date"></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px" id="recAviso"></p>
+    <div class="sheet-acts">
+      <button class="btn sec" id="btnRecCancel">Cancelar</button>
+      <button class="btn pri" id="btnRecGerar">Visualizar recibo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Recibo: impressão -->
+<div id="printArea">
+  <div class="rec" id="recDoc"></div>
+  <div class="rec-btns no-print">
+    <button class="btn sec" id="btnRecFechar">Fechar</button>
+    <button class="btn pri" id="btnRecPrint">Imprimir / Salvar PDF</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -239,6 +297,8 @@ const KEY = 'capitalcred-clientes';
 const KEY_NUM = 'capitalcred-numeros';
 const KEY_META = 'capitalcred-meta';
 const KEY_PCT = 'capitalcred-comissao';
+const KEY_EMISSOR = 'capitalcred-emissor';
+const KEY_RECN = 'capitalcred-recibo-n';
 let pctGlobal = 37;
 const ETAPAS = {
   NAO_RESPONDEU:'Não respondeu', INTERESSADO:'Interessado', DOCUMENTOS:'Pegou documento',
@@ -249,6 +309,8 @@ const ORDEM = ['TODOS','INTERESSADO','DOCUMENTOS','MANDOU_PAGAR','NAO_RESPONDEU'
 let clientes = [];
 let numeros = [];
 let meta = 0;
+let emissor = {nome:'',doc:'',cidade:''};
+let reciboCliId = null;
 let filtro = 'TODOS';
 let filtroNum = 'TODOS';
 let editId = null;
@@ -279,6 +341,7 @@ function load(){
   try { numeros = JSON.parse(localStorage.getItem(KEY_NUM)) || []; } catch(e){ numeros = []; }
   meta = parseFloat(localStorage.getItem(KEY_META)) || 0;
   pctGlobal = parseFloat(localStorage.getItem(KEY_PCT)) || 37;
+  try { emissor = JSON.parse(localStorage.getItem(KEY_EMISSOR)) || emissor; } catch(e){}
   let migrou = false;
   for(const c of clientes){
     if((c.etapa==='PAGO'||c.etapa==='NAO_LIBEROU') && c.pct==null){ c.pct = pctGlobal; migrou = true; }
@@ -416,6 +479,7 @@ function renderLista(){
       '</div>'+
       '<div class="cli-acts">'+
         (wa?'<a class="abtn wa" target="_blank" href="'+wa+'">WhatsApp</a>':'')+
+        '<button class="abtn rec-b">Recibo</button>'+
         '<button class="abtn ed">Editar</button>'+
       '</div>';
     div.querySelector('.nm').textContent = c.nome;
@@ -423,6 +487,7 @@ function renderLista(){
       new Date(c.dataRef||c.createdAt).toLocaleDateString('pt-BR') + ' · ' +
       (c.tel||'sem telefone') + (c.numero?' · via '+c.numero:'') + (c.obs?' · '+c.obs:'');
     div.querySelector('.ed').onclick = ()=>abrirEditar(c.id);
+    div.querySelector('.rec-b').onclick = ()=>abrirRecibo(c.id);
     box.appendChild(div);
   }
 }
@@ -576,7 +641,7 @@ function renderListaNumeros(){
 }
 
 function exportar(){
-  const dados = { app:'meu-painel', versao:3, exportadoEm:new Date().toISOString(), clientes, numeros, meta, comissao:pctGlobal };
+  const dados = { app:'meu-painel', versao:3, exportadoEm:new Date().toISOString(), clientes, numeros, meta, comissao:pctGlobal, emissor };
   const blob = new Blob([JSON.stringify(dados,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -597,12 +662,67 @@ function importar(file){
       numeros = Array.isArray(d.numeros) ? d.numeros : numeros;
       if(typeof d.meta === 'number') { meta = d.meta; localStorage.setItem(KEY_META, String(meta)); }
       if(typeof d.comissao === 'number' && d.comissao>0) { pctGlobal = d.comissao; localStorage.setItem(KEY_PCT, String(pctGlobal)); atualizaLabels(); }
+      if(d.emissor && typeof d.emissor==='object') { emissor = d.emissor; localStorage.setItem(KEY_EMISSOR, JSON.stringify(emissor)); }
       save(); saveNumeros(); render();
       $('overlayCfg').classList.remove('open');
       toast('Backup importado ✅');
     } catch(e){ toast('Arquivo inválido'); }
   };
   reader.readAsText(file);
+}
+
+/* ---------- Recibo ---------- */
+function extenso(v){
+  // simples: usa Intl pra valor formatado; extenso completo é complexo, então mostramos formatado
+  return brl(v);
+}
+
+function abrirRecibo(id){
+  const c = clientes.find(x=>x.id===id); if(!c) return;
+  reciboCliId = id;
+  $('fRecValor').value = c.valor || '';
+  $('fRecDesc').value = 'Intermediação de operação de crédito consignado';
+  $('fRecData').value = toInput(Date.now());
+  $('recAviso').textContent = (!emissor.nome && !emissor.doc)
+    ? 'Dica: cadastra teus dados no ⚙️ pra saírem no recibo.'
+    : '';
+  $('overlayRec').classList.add('open');
+}
+
+function gerarRecibo(){
+  const c = clientes.find(x=>x.id===reciboCliId); if(!c) return;
+  const raw = String($('fRecValor').value).trim();
+  let valor = parseFloat(raw.replace(/\./g,'').replace(',','.'));
+  if(isNaN(valor)) valor = parseFloat(raw)||0;
+  if(valor<=0){ toast('Coloca o valor do recibo'); return; }
+  const desc = $('fRecDesc').value.trim() || 'Prestação de serviço';
+  const dataTs = tsFromInput($('fRecData').value) || Date.now();
+  const dataFmt = new Date(dataTs).toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+
+  let n = (parseInt(localStorage.getItem(KEY_RECN))||0) + 1;
+  localStorage.setItem(KEY_RECN, String(n));
+  const num = String(n).padStart(4,'0');
+
+  const doc = $('recDoc');
+  doc.innerHTML =
+    '<div class="rec-head"><div class="rh-l"><div class="rec-logo">C</div><h2>RECIBO</h2></div>'+
+    '<div class="rec-num">Nº '+num+'<br>'+new Date(dataTs).toLocaleDateString('pt-BR')+'</div></div>'+
+    '<div class="rec-row"><span>Cliente</span><p class="rc-nome"></p></div>'+
+    (c.tel?'<div class="rec-row"><span>Contato</span><p class="rc-tel"></p></div>':'')+
+    '<div class="rec-row"><span>Referente a</span><p class="rc-desc"></p></div>'+
+    '<div class="rec-valor"><span>Valor</span><b>'+brl(valor)+'</b></div>'+
+    '<div class="rec-row"><p class="rc-cidade" style="margin-top:10px"></p></div>'+
+    '<div class="rec-ass"><div class="linha-ass"><p class="rc-emnome"></p><small class="rc-emdoc"></small></div></div>'+
+    '<div class="rec-foot">Documento gerado pelo Meu Painel — não substitui nota fiscal.</div>';
+  doc.querySelector('.rc-nome').textContent = c.nome;
+  if(c.tel) doc.querySelector('.rc-tel').textContent = c.tel;
+  doc.querySelector('.rc-desc').textContent = desc;
+  doc.querySelector('.rc-cidade').textContent = (emissor.cidade?emissor.cidade+', ':'')+dataFmt+'.';
+  doc.querySelector('.rc-emnome').textContent = emissor.nome || '____________________';
+  doc.querySelector('.rc-emdoc').textContent = emissor.doc ? 'CPF/CNPJ: '+emissor.doc : '';
+
+  $('overlayRec').classList.remove('open');
+  $('printArea').classList.add('open');
 }
 
 /* ---------- Eventos ---------- */
@@ -614,7 +734,7 @@ $('fValor').addEventListener('input', atualizaPrevia);
 $('fPctCli').addEventListener('input', atualizaPrevia);
 $('overlay').addEventListener('click', e=>{ if(e.target===$('overlay')) fechar(); });
 
-$('btnCfg').onclick = ()=>{ $('fMeta').value = meta||''; $('fPct').value = pctGlobal; renderListaNumeros(); $('overlayCfg').classList.add('open'); };
+$('btnCfg').onclick = ()=>{ $('fMeta').value = meta||''; $('fPct').value = pctGlobal; $('fEmNome').value=emissor.nome||''; $('fEmDoc').value=emissor.doc||''; $('fEmCidade').value=emissor.cidade||''; renderListaNumeros(); $('overlayCfg').classList.add('open'); };
 $('btnCfgFechar').onclick = ()=>$('overlayCfg').classList.remove('open');
 $('overlayCfg').addEventListener('click', e=>{ if(e.target===$('overlayCfg')) $('overlayCfg').classList.remove('open'); });
 
@@ -647,6 +767,18 @@ $('btnAddNumero').onclick = ()=>{
 $('btnExportar').onclick = exportar;
 $('btnImportar').onclick = ()=>$('fileImport').click();
 $('fileImport').addEventListener('change', e=>{ if(e.target.files[0]) importar(e.target.files[0]); e.target.value=''; });
+
+$('btnRecCancel').onclick = ()=>$('overlayRec').classList.remove('open');
+$('overlayRec').addEventListener('click', e=>{ if(e.target===$('overlayRec')) $('overlayRec').classList.remove('open'); });
+$('btnRecGerar').onclick = gerarRecibo;
+$('btnRecFechar').onclick = ()=>$('printArea').classList.remove('open');
+$('btnRecPrint').onclick = ()=>window.print();
+
+$('btnEmissor').onclick = ()=>{
+  emissor = { nome:$('fEmNome').value.trim(), doc:$('fEmDoc').value.trim(), cidade:$('fEmCidade').value.trim() };
+  localStorage.setItem(KEY_EMISSOR, JSON.stringify(emissor));
+  toast('Dados do recibo salvos');
+};
 
 $('btnExtrato').onclick = abrirExtrato;
 $('btnExtFechar').onclick = ()=>$('overlayExt').classList.remove('open');
