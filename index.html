@@ -162,6 +162,7 @@
     <div class="fld"><label>WhatsApp (com DDD)</label><input id="fTel" inputmode="tel" placeholder="96 99999-9999"></div>
     <div class="fld"><label>Número que contatei</label><select id="fNumero"><option value="">—</option></select></div>
     <div class="fld"><label>Valor que libera (R$)</label><input id="fValor" inputmode="decimal" placeholder="0,00"></div>
+    <div class="fld"><label>% de comissão deste cliente</label><input id="fPctCli" inputmode="decimal" placeholder="37"></div>
     <div class="previa" id="previa" style="display:none">Sua comissão (37%): <b id="previaVal">R$ 0,00</b></div>
     <div class="fld"><label>Etapa</label>
       <select id="fEtapa">
@@ -190,7 +191,7 @@
     <h3>Configurações</h3>
 
     <h4>💰 % de comissão</h4>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Vale pros próximos clientes. Quem já pagou mantém a taxa da época.</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Taxa padrão que já vem preenchida nos cadastros novos. Dá pra ajustar cliente por cliente na hora de cadastrar ou editar.</p>
     <div class="fld" style="display:flex;gap:8px">
       <input id="fPct" inputmode="decimal" placeholder="37" style="flex:1">
       <button class="btn pri" id="btnPct" style="flex:0 0 auto;padding:11px 16px">Salvar</button>
@@ -261,12 +262,11 @@ const tsFromInput = v => { if(!v) return null; const p=v.split('-').map(Number);
 const toInput = ts => { const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const fimDoDia = ts => { const d=new Date(ts); d.setHours(23,59,59,999); return d.getTime(); };
 
-function comFor(c){
-  const pct = ((c.etapa==='PAGO'||c.etapa==='NAO_LIBEROU') && c.pct!=null) ? c.pct : pctGlobal;
-  return (c.valor||0)*pct/100;
-}
 function pctOf(c){
-  return ((c.etapa==='PAGO'||c.etapa==='NAO_LIBEROU') && c.pct!=null) ? c.pct : pctGlobal;
+  return c.pct!=null ? c.pct : pctGlobal;
+}
+function comFor(c){
+  return (c.valor||0)*pctOf(c)/100;
 }
 
 function toast(msg){
@@ -481,6 +481,7 @@ function abrirNovo(){
   $('fNome').value=''; $('fTel').value=''; $('fValor').value='';
   $('fEtapa').value='NAO_RESPONDEU'; $('fObs').value='';
   $('fData').value=toInput(Date.now()); $('fRetorno').value='';
+  $('fPctCli').value = pctGlobal;
   renderNumeroSelect('');
   $('btnDel').style.display='none';
   atualizaPrevia();
@@ -495,6 +496,7 @@ function abrirEditar(id){
   $('fValor').value=c.valor||''; $('fEtapa').value=c.etapa; $('fObs').value=c.obs||'';
   $('fData').value=toInput(c.dataRef||c.pagoEm||c.perdidoEm||c.createdAt||Date.now());
   $('fRetorno').value = c.retorno ? toInput(c.retorno) : '';
+  $('fPctCli').value = c.pct!=null ? c.pct : pctGlobal;
   renderNumeroSelect(c.numero||'');
   $('btnDel').style.display='block';
   atualizaPrevia();
@@ -505,7 +507,9 @@ function fechar(){ $('overlay').classList.remove('open'); }
 
 function atualizaPrevia(){
   const v = parseFloat(String($('fValor').value).replace(/\./g,'').replace(',','.'))||parseFloat($('fValor').value)||0;
-  if(v>0){ document.querySelector('#previa').firstChild.textContent='Sua comissão ('+pctGlobal+'%): '; $('previa').style.display='block'; $('previaVal').textContent=brl(v*pctGlobal/100); }
+  const p = parseFloat(String($('fPctCli').value).replace(',','.'));
+  const pct = (!isNaN(p) && p>0 && p<=100) ? p : pctGlobal;
+  if(v>0){ document.querySelector('#previa').firstChild.textContent='Sua comissão ('+pct+'%): '; $('previa').style.display='block'; $('previaVal').textContent=brl(v*pct/100); }
   else $('previa').style.display='none';
 }
 
@@ -519,14 +523,15 @@ function salvar(){
   const agora = Date.now();
   const dataTs = tsFromInput($('fData').value) || agora;
   const retornoTs = tsFromInput($('fRetorno').value);
+  const pRaw = parseFloat(String($('fPctCli').value).replace(',','.'));
+  const pctCli = (!isNaN(pRaw) && pRaw>0 && pRaw<=100) ? pRaw : pctGlobal;
 
   if(editId){
     const c = clientes.find(x=>x.id===editId);
     Object.assign(c,{nome, tel:$('fTel').value.trim(), valor, etapa, obs:$('fObs').value.trim(),
-      numero:$('fNumero').value, updatedAt:agora, dataRef:dataTs, retorno:retornoTs});
-    if(etapa==='PAGO'){ c.pagoEm=dataTs; if(c.pct==null) c.pct=pctGlobal; }
-    else if(etapa==='NAO_LIBEROU'){ c.perdidoEm=dataTs; if(c.pct==null) c.pct=pctGlobal; }
-    else { c.pct=null; }
+      numero:$('fNumero').value, updatedAt:agora, dataRef:dataTs, retorno:retornoTs, pct:pctCli});
+    if(etapa==='PAGO') c.pagoEm=dataTs;
+    if(etapa==='NAO_LIBEROU') c.perdidoEm=dataTs;
   } else {
     clientes.push({
       id:'c'+agora+Math.random().toString(36).slice(2,6),
@@ -534,7 +539,7 @@ function salvar(){
       numero:$('fNumero').value, createdAt:agora, updatedAt:agora, dataRef:dataTs, retorno:retornoTs,
       pagoEm: etapa==='PAGO'?dataTs:null,
       perdidoEm: etapa==='NAO_LIBEROU'?dataTs:null,
-      pct: (etapa==='PAGO'||etapa==='NAO_LIBEROU')?pctGlobal:null
+      pct: pctCli
     });
   }
   save(); fechar(); render();
@@ -606,6 +611,7 @@ $('btnCancel').onclick = fechar;
 $('btnSave').onclick = salvar;
 $('btnDel').onclick = excluir;
 $('fValor').addEventListener('input', atualizaPrevia);
+$('fPctCli').addEventListener('input', atualizaPrevia);
 $('overlay').addEventListener('click', e=>{ if(e.target===$('overlay')) fechar(); });
 
 $('btnCfg').onclick = ()=>{ $('fMeta').value = meta||''; $('fPct').value = pctGlobal; renderListaNumeros(); $('overlayCfg').classList.add('open'); };
